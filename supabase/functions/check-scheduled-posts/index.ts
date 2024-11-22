@@ -1,5 +1,5 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
+import { createClient } from 'https://deno.land/x/supabase@1.3.1/mod.ts'
 
 interface ScheduledPost {
   id: string;
@@ -108,9 +108,16 @@ async function publishPost(post: ScheduledPost) {
 
 serve(async (_req) => {
   try {
+    console.log('Starting scheduled posts check');
     const now = new Date();
     const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
     const fiveMinutesFromNow = new Date(now.getTime() + 5 * 60 * 1000);
+
+    console.log('Time window:', {
+      now: now.toISOString(),
+      fiveMinutesAgo: fiveMinutesAgo.toISOString(),
+      fiveMinutesFromNow: fiveMinutesFromNow.toISOString()
+    });
 
     // Get posts scheduled for the next 5 minutes
     const { data: posts, error } = await supabase
@@ -120,20 +127,38 @@ serve(async (_req) => {
       .gte('scheduled_date', fiveMinutesAgo.toISOString())
       .lte('scheduled_date', fiveMinutesFromNow.toISOString());
 
+    console.log('Found posts:', {
+      count: posts?.length || 0,
+      posts: posts,
+      error: error
+    });
+
     if (error) throw error;
 
     // Publish each post
     for (const post of posts ?? []) {
+      console.log('Attempting to publish post:', post.id);
       await publishPost(post as ScheduledPost);
+      console.log('Successfully published post:', post.id);
     }
 
-    return new Response(JSON.stringify({ success: true }), {
+    return new Response(JSON.stringify({ 
+      success: true,
+      postsProcessed: posts?.length || 0,
+      timeWindow: {
+        start: fiveMinutesAgo.toISOString(),
+        end: fiveMinutesFromNow.toISOString()
+      }
+    }), {
       headers: { 'Content-Type': 'application/json' },
     });
 
   } catch (err) {
     console.error('Error checking scheduled posts:', err);
-    return new Response(JSON.stringify({ error: err instanceof Error ? err.message : 'Unknown error' }), {
+    return new Response(JSON.stringify({ 
+      error: err instanceof Error ? err.message : 'Unknown error',
+      timestamp: new Date().toISOString()
+    }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
     });

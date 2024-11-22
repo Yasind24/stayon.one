@@ -49,6 +49,21 @@ export function ContentCalendar() {
     return new Date(currentMonth.getFullYear(), currentMonth.getMonth(), dayNumber);
   });
 
+  const getPostStatusColor = (status: string) => {
+    switch (status) {
+      case 'published':
+        return 'bg-green-500';
+      case 'failed':
+        return 'bg-red-500';
+      case 'pending':
+        return 'bg-indigo-500';
+      case 'draft':
+        return 'bg-gray-400';
+      default:
+        return 'bg-indigo-500';
+    }
+  };
+
   const getPostsForDate = (date: Date) => {
     return scheduledPosts.filter(post => {
       const postDate = new Date(post.scheduled_date);
@@ -132,82 +147,69 @@ export function ContentCalendar() {
             <span className="sm:hidden">{day[0]}</span>
           </div>
         ))}
-        {calendarDays.map((date, i) => {
-          if (!date) {
-            return (
-              <div
-                key={`empty-${i}`}
-                className="aspect-square border border-transparent"
-              />
-            );
-          }
-
-          const isToday = date.toDateString() === new Date().toDateString();
-          const isPast = date < new Date(new Date().setHours(0, 0, 0, 0));
+        {Array.from({ length: 42 }, (_, i) => {
+          const date = new Date(firstDayOfMonth);
+          date.setDate(1 - firstDayOfMonth.getDay() + i);
           const postsForDate = getPostsForDate(date);
-          const hasScheduledPosts = postsForDate.length > 0;
-
+          const isCurrentMonth = date.getMonth() === currentMonth.getMonth();
+          
           return (
             <div
-              key={date.toISOString()}
-              className="relative"
-              onMouseEnter={() => hasScheduledPosts && setHoveredDate(date)}
-              onMouseLeave={() => setHoveredDate(null)}
+              key={i}
+              className={`
+                relative p-2 min-h-[80px] border rounded-lg
+                ${isCurrentMonth ? 'bg-white' : 'bg-gray-50'}
+                ${date.toDateString() === new Date().toDateString() ? 'border-indigo-500' : 'border-gray-100'}
+              `}
             >
-              <div
-                className={`w-full aspect-square border rounded-lg p-1 sm:p-2 text-xs sm:text-sm ${
-                  isToday
-                    ? 'bg-indigo-50 border-indigo-200'
-                    : isPast
-                    ? 'bg-gray-50 border-gray-200 text-gray-400'
-                    : 'border-gray-200'
-                }`}
-              >
-                <span className="block text-center mb-1">{date.getDate()}</span>
-                {hasScheduledPosts && (
-                  <div className="absolute bottom-1 left-1/2 transform -translate-x-1/2 flex gap-0.5 sm:gap-1">
-                    {postsForDate.slice(0, 3).map((_, index) => (
-                      <div key={index} className="w-1 h-1 sm:w-1.5 sm:h-1.5 bg-indigo-500 rounded-full"></div>
-                    ))}
-                    {postsForDate.length > 3 && (
-                      <span className="text-xs text-indigo-600">+{postsForDate.length - 3}</span>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Tooltip for scheduled posts */}
-              {hoveredDate?.getTime() === date.getTime() && hasScheduledPosts && (
-                <div className="absolute z-10 bg-white rounded-lg shadow-lg border border-gray-200 p-3 w-64 mt-1 left-1/2 transform -translate-x-1/2">
-                  <div className="max-h-48 overflow-y-auto space-y-2">
-                    {postsForDate.map((post, index) => (
-                      <div key={post.id} className="text-left">
-                        {index > 0 && <div className="border-t my-2"></div>}
-                        <div className="flex items-center gap-1 mb-1">
-                          {post.post_platforms?.map((platform) => {
-                            const Icon = PlatformIcons[platform.platform_id];
-                            return Icon ? (
-                              <Icon key={platform.id} className="w-4 h-4 text-gray-600" />
-                            ) : null;
-                          })}
-                          <span className="text-xs text-gray-500 ml-auto">
-                            {formatTime(post.scheduled_date)}
-                          </span>
-                        </div>
-                        <p className="text-sm text-gray-900 line-clamp-2">{post.content}</p>
-                        {post.media_url && (
-                          <div className="mt-1 text-xs text-indigo-600">
-                            Contains media
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+              <span className={`text-sm ${isCurrentMonth ? 'text-gray-900' : 'text-gray-400'}`}>
+                {date.getDate()}
+              </span>
+              
+              {postsForDate.length > 0 && (
+                <div className="mt-1 space-y-1">
+                  {postsForDate.slice(0, 2).map((post) => (
+                    <div
+                      key={post.id}
+                      className="flex items-center gap-1 text-xs"
+                    >
+                      <div 
+                        className={`w-2 h-2 rounded-full ${getPostStatusColor(post.status)}`} 
+                      />
+                      <span className="truncate">
+                        {formatTime(post.scheduled_date)}
+                      </span>
+                    </div>
+                  ))}
+                  {postsForDate.length > 2 && (
+                    <div className="text-xs text-indigo-600 font-medium">
+                      +{postsForDate.length - 2} more
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           );
         })}
+      </div>
+
+      <div className="mt-4 flex items-center gap-4 text-xs text-gray-600">
+        <div className="flex items-center gap-1">
+          <div className="w-2 h-2 rounded-full bg-indigo-500" />
+          <span>Pending</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <div className="w-2 h-2 rounded-full bg-green-500" />
+          <span>Published</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <div className="w-2 h-2 rounded-full bg-red-500" />
+          <span>Failed</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <div className="w-2 h-2 rounded-full bg-gray-400" />
+          <span>Draft</span>
+        </div>
       </div>
 
       {scheduledPosts.length === 0 && (

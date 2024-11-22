@@ -3,13 +3,18 @@ name: Scheduled Posts Check
 on:
   schedule:
     - cron: '* * * * *'  # Runs every minute
+  workflow_dispatch: # Allows manual triggering
 
 jobs:
   check-posts:
     runs-on: ubuntu-latest
     env:
       SUPABASE_FUNCTION_URL: ${{ secrets.SUPABASE_FUNCTION_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
     steps:
       - name: Check Scheduled Posts
         run: |
-          curl -X POST "${SUPABASE_FUNCTION_URL}/check-scheduled-posts"
+          response=$(curl -X POST "${SUPABASE_FUNCTION_URL}/check-scheduled-posts" \
+            -H "Authorization: Bearer ${SUPABASE_ANON_KEY}" \
+            -H "Content-Type: application/json")
+          echo "Response: $response"

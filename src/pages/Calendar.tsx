@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Layout } from '../components/Layout';
-import { Calendar as CalendarIcon, Twitter, Linkedin, Facebook, Instagram, Youtube, AtSign, Edit3, Trash2 } from 'lucide-react';
+import { Calendar as CalendarIcon, Twitter, Linkedin, Facebook, Instagram, Youtube, AtSign, Edit3, Trash2, MoreVertical, ChevronLeft, ChevronRight } from 'lucide-react';
 import { ScheduleModal } from '../components/ScheduleModal';
 import { EditPostModal } from '../components/EditPostModal';
 import { toast } from 'react-hot-toast';
@@ -26,6 +26,7 @@ export function Calendar() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [isDeleting, setIsDeleting] = useState(false);
+  const [activeDropdownId, setActiveDropdownId] = useState<string | null>(null);
 
   const fetchScheduledPosts = async () => {
     try {
@@ -52,34 +53,6 @@ export function Calendar() {
 
     setSelectedDate(date);
     setIsModalOpen(true);
-  };
-
-  const handleEditPost = (post: ScheduledPost) => {
-    const scheduledDate = new Date(post.scheduled_date);
-    const now = new Date();
-    const minAllowedTime = new Date(now.getTime() + MIN_SCHEDULE_BUFFER);
-
-    if (scheduledDate < minAllowedTime) {
-      toast.error("Cannot edit posts scheduled within the next 15 minutes");
-      return;
-    }
-
-    setSelectedPost(post);
-    setIsEditModalOpen(true);
-  };
-
-  const handleDeletePost = async (post: ScheduledPost) => {
-    try {
-      setIsDeleting(true);
-      await deleteScheduledPost(post.id);
-      await fetchScheduledPosts();
-      toast.success('Post deleted successfully');
-    } catch (error) {
-      console.error('Error deleting post:', error);
-      toast.error('Failed to delete post');
-    } finally {
-      setIsDeleting(false);
-    }
   };
 
   const handlePrevMonth = () => {
@@ -111,6 +84,17 @@ export function Calendar() {
     });
   };
 
+  const getPostStatusColor = (status: string) => {
+    switch (status) {
+      case 'published':
+        return 'bg-green-500';
+      case 'failed':
+        return 'bg-red-500';
+      default:
+        return 'bg-indigo-500';
+    }
+  };
+
   const formatTime = (dateString: string) => {
     return new Date(dateString).toLocaleTimeString('en-US', {
       hour: 'numeric',
@@ -119,11 +103,36 @@ export function Calendar() {
     });
   };
 
+  const toggleDropdown = (postId: string) => {
+    setActiveDropdownId(activeDropdownId === postId ? null : postId);
+  };
+
+  useEffect(() => {
+    const handleClickOutside = () => setActiveDropdownId(null);
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
+
+  const handleDeletePost = async (post: ScheduledPost) => {
+    try {
+      setIsDeleting(true);
+      await deleteScheduledPost(post.id);
+      await fetchScheduledPosts();
+      toast.success('Post deleted successfully');
+      setActiveDropdownId(null);
+    } catch (error) {
+      console.error('Error deleting post:', error);
+      toast.error('Failed to delete post');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const canEditPost = (post: ScheduledPost) => {
     const scheduledDate = new Date(post.scheduled_date);
     const now = new Date();
     const minAllowedTime = new Date(now.getTime() + MIN_SCHEDULE_BUFFER);
-    return scheduledDate > minAllowedTime;
+    return scheduledDate > minAllowedTime && post.status !== 'published';
   };
 
   return (
@@ -202,8 +211,11 @@ export function Calendar() {
                     <span className="block mb-1">{date.getDate()}</span>
                     {hasScheduledPosts && (
                       <div className="absolute bottom-1 left-1/2 transform -translate-x-1/2 flex gap-0.5 sm:gap-1">
-                        {postsForDate.slice(0, 3).map((_, index) => (
-                          <div key={index} className="w-1 h-1 sm:w-1.5 sm:h-1.5 bg-indigo-500 rounded-full"></div>
+                        {postsForDate.slice(0, 3).map((post, index) => (
+                          <div 
+                            key={index} 
+                            className={`w-1 h-1 sm:w-1.5 sm:h-1.5 ${getPostStatusColor(post.status)} rounded-full`}
+                          />
                         ))}
                         {postsForDate.length > 3 && (
                           <span className="text-xs text-indigo-600">+{postsForDate.length - 3}</span>
@@ -221,7 +233,7 @@ export function Calendar() {
                             {index > 0 && <div className="border-t my-2"></div>}
                             <div className="flex items-center justify-between gap-1 mb-1">
                               <div className="flex items-center gap-1">
-                                {(post as any).post_platforms?.map((platform: { platform_id: string; id: string }) => {
+                                {post.post_platforms?.map((platform) => {
                                   const Icon = PlatformIcons[platform.platform_id];
                                   return Icon ? (
                                     <Icon key={platform.id} className="w-4 h-4 text-gray-600" />
@@ -229,42 +241,19 @@ export function Calendar() {
                                 })}
                               </div>
                               <div className="flex items-center gap-2">
-                                {canEditPost(post) && (
-                                  <>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleEditPost(post);
-                                      }}
-                                      className="p-1 text-gray-400 hover:text-indigo-600 transition-colors"
-                                      title="Edit post"
-                                    >
-                                      <Edit3 className="w-4 h-4" />
-                                    </button>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleDeletePost(post);
-                                      }}
-                                      disabled={isDeleting}
-                                      className="p-1 text-gray-400 hover:text-red-600 transition-colors disabled:opacity-50"
-                                      title="Delete post"
-                                    >
-                                      <Trash2 className="w-4 h-4" />
-                                    </button>
-                                  </>
-                                )}
+                                <span className={`text-xs px-2 py-0.5 rounded-full ${
+                                  post.status === 'published' ? 'bg-green-100 text-green-800' :
+                                  post.status === 'failed' ? 'bg-red-100 text-red-800' :
+                                  'bg-gray-100 text-gray-800'
+                                }`}>
+                                  {post.status}
+                                </span>
                                 <span className="text-xs text-gray-500">
                                   {formatTime(post.scheduled_date)}
                                 </span>
                               </div>
                             </div>
                             <p className="text-sm text-gray-900 line-clamp-2">{post.content}</p>
-                            {post.media_url && (
-                              <div className="mt-1 text-xs text-indigo-600">
-                                Contains media
-                              </div>
-                            )}
                           </div>
                         ))}
                       </div>
