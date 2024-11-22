@@ -1,0 +1,15 @@
+name: Scheduled Posts Check
+
+on:
+  schedule:
+    - cron: '* * * * *'  # Runs every minute
+
+jobs:
+  check-posts:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_FUNCTION_URL: ${{ secrets.SUPABASE_FUNCTION_URL }}
+    steps:
+      - name: Check Scheduled Posts
+        run: |
+          curl -X POST "${SUPABASE_FUNCTION_URL}/check-scheduled-posts"

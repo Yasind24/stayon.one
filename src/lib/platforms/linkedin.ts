@@ -1,4 +1,5 @@
 import { supabase } from '../supabase';
+import { ScheduledPost } from '../supabase/types';
 
 const LINKEDIN_AUTH_URL = 'https://www.linkedin.com/oauth/v2/authorization';
 const SCOPES = [
@@ -31,4 +32,8 @@ export async function connectLinkedIn() {
     console.error('LinkedIn connection error:', error);
     throw error;
   }
+}
+
+export async function publishToLinkedIn(post: ScheduledPost) {
+    // Implementation
 }

@@ -1,7 +1,7 @@
 import { ScheduledPost, PostPlatform } from '../supabase/types';
-import { publishToX } from './platforms/x';
-import { publishToLinkedIn } from './platforms/linkedin';
-import { publishToYouTube } from './platforms/youtube';
+import { publishToX } from '../platforms/x';
+import { publishToLinkedIn } from '../platforms/linkedin';
+import { publishToYouTube } from '../platforms/youtube';
 import { supabase } from '../supabase';
 
 export async function publishPost(postId: string): Promise<void> {

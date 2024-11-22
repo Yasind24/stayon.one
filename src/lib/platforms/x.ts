@@ -63,8 +63,12 @@ async function generateCodeChallenge(verifier: string) {
     .replace(/=+$/, '');
 }
 
-export async function publishToX(post: ScheduledPost) {
-  console.log('=== START publishToX ===');
+export async function publishToX(post: ScheduledPost): Promise<void> {
+  console.log('=== START publishToX ===', {
+    postId: post.id,
+    hasContent: !!post.content,
+    hasMediaUrl: !!post.media_url
+  });
   
   try {
     // Get current user first for debugging
@@ -75,60 +79,63 @@ export async function publishToX(post: ScheduledPost) {
     });
 
     // Get token with debug logs
-    const token = await getXAccessToken();
+    const { data: connection, error: connectionError } = await supabase
+      .from('platform_connections')
+      .select('access_token, expires_at')
+      .eq('platform_id', 'x')
+      .eq('user_id', user?.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
     console.log('Token retrieval:', {
-      hasToken: !!token,
-      tokenLength: token?.length
+      hasConnection: !!connection,
+      error: connectionError,
+      hasToken: !!connection?.access_token,
+      expiresAt: connection?.expires_at
     });
 
-    if (!token) {
+    if (connectionError) throw connectionError;
+    if (!connection?.access_token) {
       throw new Error('X access token not found. Please reconnect your account.');
     }
 
-    // Try to get the connection directly for debugging
-    const { data: connection, error: connectionError } = await supabase
-      .from('platform_connections')
-      .select('*')
-      .eq('platform_id', 'x')
-      .eq('user_id', user?.id)
-      .single();
+    // Check if token is expired
+    if (connection.expires_at && new Date(connection.expires_at) <= new Date()) {
+      console.log('Token expiration check failed:', {
+        expiresAt: connection.expires_at,
+        now: new Date().toISOString()
+      });
+      throw new Error('X access token has expired. Please reconnect your account.');
+    }
 
-    console.log('Direct connection check:', {
-      hasConnection: !!connection,
-      error: connectionError,
-      platformId: connection?.platform_id,
-      userId: connection?.user_id,
-      hasAccessToken: !!connection?.access_token
-    });
-
-    // Proceed with publishing
-    const response = await supabase.functions.invoke('x-publish', {
-      body: {
-        text: post.content,
-        access_token: token
+    // Use the Edge Function to post
+    console.log('Attempting to post with Edge Function');
+    const { data, error } = await supabase.functions.invoke('x-post-tweet', {
+      body: { 
+        text: post.content || '',
+        accessToken: connection.access_token,
+        mediaUrl: post.media_url
       }
     });
 
-    console.log('Publish attempt:', {
-      success: !response.error,
-      error: response.error,
-      data: response.data
+    console.log('Edge Function response:', {
+      success: !error,
+      hasData: !!data,
+      error
     });
 
-    if (response.error) {
-      throw response.error;
-    }
-
-    return response.data;
+    if (error) throw error;
+    return data;
   } catch (error) {
-    console.error('=== ERROR in publishToX ===', error);
+    console.error('Detailed X publishing error:', error);
     throw error;
   } finally {
     console.log('=== END publishToX ===');
   }
 }
 
-async function getXAccessToken() {
+export async function getXAccessToken() {
   console.log('=== START getXAccessToken ===');
   
   try {

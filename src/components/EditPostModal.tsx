@@ -6,6 +6,8 @@ import { updateScheduledPost } from '../lib/supabase/posts';
 import { MediaUpload } from './MediaUpload';
 import { Calendar } from './Calendar';
 import type { ScheduledPost } from '../lib/supabase/types';
+import { MIN_SCHEDULE_BUFFER } from '../lib/constants';
+import { usePlatformConnections } from '../lib/stores/platformConnections';
 
 interface EditPostModalProps {
   isOpen: boolean;
@@ -17,12 +19,18 @@ interface EditPostModalProps {
 export function EditPostModal({ isOpen, onClose, post, onUpdate }: EditPostModalProps) {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date(post.scheduled_date));
   const [selectedTime, setSelectedTime] = useState<string>('');
-  const [content, setContent] = useState<string>(post.content);
+  const [content, setContent] = useState<string>(post.content || '');
   const [link, setLink] = useState<string>(post.link || '');
   const [mediaUrl, setMediaUrl] = useState<string>(post.media_url || '');
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
+
+  const { connections } = usePlatformConnections();
+
+  const availablePlatforms = PLATFORMS.filter(platform => 
+    connections.some(conn => conn.platform_id === platform.id)
+  );
 
   useEffect(() => {
     if (isOpen) {
@@ -37,10 +45,10 @@ export function EditPostModal({ isOpen, onClose, post, onUpdate }: EditPostModal
     const [hours, minutes] = e.target.value.split(':').map(Number);
     selectedDateTime.setHours(hours, minutes);
 
-    const minAllowedTime = new Date(new Date().getTime() + 60 * 60 * 1000);
+    const minAllowedTime = new Date(new Date().getTime() + MIN_SCHEDULE_BUFFER);
 
     if (selectedDateTime < minAllowedTime) {
-      toast.error('Please select a time at least 1 hour from now');
+      toast.error('Please select a time at least 15 minutes from now');
       return;
     }
 
@@ -71,9 +79,9 @@ export function EditPostModal({ isOpen, onClose, post, onUpdate }: EditPostModal
       const [hours, minutes] = selectedTime.split(':').map(Number);
       scheduledDateTime.setHours(hours, minutes);
 
-      const minAllowedTime = new Date(new Date().getTime() + 60 * 60 * 1000);
+      const minAllowedTime = new Date(new Date().getTime() + MIN_SCHEDULE_BUFFER);
       if (scheduledDateTime < minAllowedTime) {
-        toast.error('Please select a time at least 1 hour from now');
+        toast.error('Please select a time at least 15 minutes from now');
         return;
       }
 
@@ -191,7 +199,7 @@ export function EditPostModal({ isOpen, onClose, post, onUpdate }: EditPostModal
                     Platforms
                   </label>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {PLATFORMS.map((platform) => (
+                    {availablePlatforms.map((platform) => (
                       <label
                         key={platform.id}
                         className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:border-indigo-500 transition-colors"
@@ -220,7 +228,7 @@ export function EditPostModal({ isOpen, onClose, post, onUpdate }: EditPostModal
                     className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   />
                   <p className="mt-1 text-sm text-gray-500">
-                    Must be at least 1 hour from now
+                    Must be at least 15 minutes from now
                   </p>
                 </div>
               </div>

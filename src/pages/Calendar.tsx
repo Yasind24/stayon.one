@@ -6,6 +6,7 @@ import { EditPostModal } from '../components/EditPostModal';
 import { toast } from 'react-hot-toast';
 import { getScheduledPosts, deleteScheduledPost } from '../lib/supabase/posts';
 import type { ScheduledPost } from '../lib/supabase/types';
+import { MIN_SCHEDULE_BUFFER } from '../lib/constants';
 
 const PlatformIcons: Record<string, React.ElementType> = {
   x: Twitter,
@@ -20,7 +21,6 @@ export function Calendar() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [scheduledPosts, setScheduledPosts] = useState<ScheduledPost[]>([]);
-  const [loading, setLoading] = useState(true);
   const [hoveredDate, setHoveredDate] = useState<Date | null>(null);
   const [selectedPost, setSelectedPost] = useState<ScheduledPost | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -34,8 +34,6 @@ export function Calendar() {
     } catch (error) {
       console.error('Error fetching scheduled posts:', error);
       toast.error('Failed to load scheduled posts');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -59,10 +57,10 @@ export function Calendar() {
   const handleEditPost = (post: ScheduledPost) => {
     const scheduledDate = new Date(post.scheduled_date);
     const now = new Date();
-    const minAllowedTime = new Date(now.getTime() + 60 * 60 * 1000);
+    const minAllowedTime = new Date(now.getTime() + MIN_SCHEDULE_BUFFER);
 
     if (scheduledDate < minAllowedTime) {
-      toast.error("Cannot edit posts scheduled within the next hour");
+      toast.error("Cannot edit posts scheduled within the next 15 minutes");
       return;
     }
 
@@ -124,7 +122,7 @@ export function Calendar() {
   const canEditPost = (post: ScheduledPost) => {
     const scheduledDate = new Date(post.scheduled_date);
     const now = new Date();
-    const minAllowedTime = new Date(now.getTime() + 60 * 60 * 1000);
+    const minAllowedTime = new Date(now.getTime() + MIN_SCHEDULE_BUFFER);
     return scheduledDate > minAllowedTime;
   };
 

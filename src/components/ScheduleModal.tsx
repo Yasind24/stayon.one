@@ -7,6 +7,7 @@ import { createDraft } from '../lib/supabase/drafts';
 import { PostTypeSelector } from './PostTypeSelector';
 import { PostFields } from './PostFields';
 import { usePlatformConnections } from '../lib/stores/platformConnections';
+import { useUserSettings } from '../lib/stores/userSettings';
 
 interface ScheduleModalProps {
   isOpen: boolean;
@@ -48,6 +49,7 @@ export function ScheduleModal({
   const [thumbnail, setThumbnail] = useState<string>('');
 
   const { connections } = usePlatformConnections();
+  const { timezone } = useUserSettings();
 
   // Filter platforms based on connected accounts
   const availablePlatforms = PLATFORMS.filter(platform => 
@@ -85,10 +87,10 @@ export function ScheduleModal({
     const [hours, minutes] = e.target.value.split(':').map(Number);
     selectedDateTime.setHours(hours, minutes);
 
-    const minAllowedTime = new Date(new Date().getTime() + 60 * 60 * 1000);
+    const minAllowedTime = new Date(new Date().getTime() + 5 * 60 * 1000);
 
     if (selectedDateTime < minAllowedTime && !isDraft) {
-      toast.error('Please select a time at least 1 hour from now');
+      toast.error('Please select a time at least 5 minutes from now');
       return;
     }
 
@@ -131,6 +133,16 @@ export function ScheduleModal({
 
   const handleSchedule = async () => {
     try {
+      // Add debug logging
+      console.log('Starting schedule process:', {
+        content,
+        selectedPlatforms,
+        selectedDate,
+        selectedTime,
+        timezone,
+        isDraft
+      });
+
       if (!content.trim() && !title.trim()) {
         toast.error('Please enter content for your post');
         return;
@@ -146,39 +158,54 @@ export function ScheduleModal({
         return;
       }
 
+      // Create date in user's timezone
       const scheduledDateTime = new Date(selectedDate);
       const [hours, minutes] = selectedTime.split(':').map(Number);
       scheduledDateTime.setHours(hours, minutes);
 
+      console.log('Scheduled date before timezone conversion:', scheduledDateTime);
+
+      // Convert to UTC for storage
+      const userTimezone = timezone || 'UTC';
+      const utcDate = new Date(scheduledDateTime.toLocaleString('en-US', { timeZone: userTimezone }));
+
+      console.log('UTC date after conversion:', utcDate);
+
       if (!isDraft) {
-        const minAllowedTime = new Date(new Date().getTime() + 60 * 60 * 1000);
-        if (scheduledDateTime < minAllowedTime) {
-          toast.error('Please select a time at least 1 hour from now');
+        const minAllowedTime = new Date(new Date().getTime() + 5 * 60 * 1000);
+        if (utcDate < minAllowedTime) {
+          toast.error('Please select a time at least 5 minutes from now');
           return;
         }
       }
 
       setIsSubmitting(true);
 
-      await createScheduledPost({
+      const postData = {
         content,
         mediaUrl: mediaUrl || undefined,
         link: link || undefined,
-        scheduledDate: scheduledDateTime,
+        scheduledDate: utcDate,
         platforms: selectedPlatforms,
         isDraft,
         title,
         description,
         thumbnail,
         postType
-      });
+      };
+
+      console.log('Sending post data:', postData);
+
+      await createScheduledPost(postData);
 
       toast.success(isDraft ? 'Draft saved successfully!' : 'Post scheduled successfully!');
       onSchedule();
       onClose();
     } catch (error) {
-      console.error('Error scheduling post:', error);
-      toast.error(isDraft ? 'Failed to save draft. Please try again.' : 'Failed to schedule post. Please try again.');
+      console.error('Detailed error scheduling post:', error);
+      // More detailed error message
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      toast.error(`Failed to schedule post: ${errorMessage}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -339,7 +366,7 @@ export function ScheduleModal({
                   />
                   {!isDraft && (
                     <p className="mt-1 text-sm text-gray-500">
-                      Must be at least 1 hour from now
+                      Must be at least 5 minutes from now
                     </p>
                   )}
                 </div>

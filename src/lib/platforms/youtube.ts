@@ -1,4 +1,5 @@
 import { supabase } from '../supabase';
+import { ScheduledPost } from '../supabase/types';
 
 const YOUTUBE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const SCOPES = [
@@ -34,4 +35,8 @@ export async function connectYouTube() {
     console.error('YouTube connection error:', error);
     throw error;
   }
+}
+
+export function publishToYouTube(post: ScheduledPost) {
+    // ... function implementation ...
 }

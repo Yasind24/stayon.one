@@ -75,6 +75,7 @@ export async function getScheduledPosts(): Promise<ScheduledPost[]> {
       )
     `)
     .eq('user_id', user.id)
+    .in('status', ['pending', 'draft'])
     .order('scheduled_date', { ascending: true });
 
   if (error) throw error;
